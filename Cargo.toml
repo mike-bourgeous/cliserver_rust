@@ -1,0 +1,10 @@
+[package]
+name = "cliserver_rust"
+version = "0.1.0"
+authors = ["Mike Bourgeous <mike@mikebourgeous.com>"]
+
+[dependencies]
+futures = "0.1.0"
+tokio-core = "0.1.0"
+tokio-service = "0.1.0"
+tokio-proto = "0.1.0"
