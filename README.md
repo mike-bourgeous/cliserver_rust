@@ -2,11 +2,11 @@
 
 # WIP - Much TODO
 
-A simple interactive command-line server built in Rust using [tokio][0].  This
+A simple interactive command-line server built in Rust using [Tokio][0].  This
 was built as a learning exercise for myself to translate my knowledge of
 libevent in C and EventMachine in Ruby to Rust.  It is based in concept on my
-original [cliserver][1] example code for libevent, using the [echo server
-example][2] from tokio to get started.
+original [cliserver][1] example code for libevent, using the [Tokio echo server
+example][2] to get started.
 
 Clients connect to the server on port 14311, allowing them to run the following
 commands:
