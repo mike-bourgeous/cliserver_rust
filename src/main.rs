@@ -8,6 +8,7 @@ use std::str;
 use tokio_core::io::{Codec, EasyBuf};
 use tokio_core::io::{Io, Framed};
 use tokio_proto::pipeline::ServerProto;
+use tokio_proto::TcpServer;
 use tokio_service::Service;
 use futures::{future, Future, BoxFuture};
 
@@ -107,6 +108,9 @@ impl Service for CliServer {
 
 
 fn main() {
-    // TODO
-    println!("Hello, world!");
+    let addr = "0.0.0.0:14311".parse().unwrap();
+    let server = TcpServer::new(CliProto, addr);
+
+    println!("Serving on {}", addr);
+    server.serve(|| Ok(CliServer));
 }
