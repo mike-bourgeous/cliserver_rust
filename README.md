@@ -5,7 +5,8 @@
 A simple interactive command-line server built in Rust using [tokio][0].  This
 was built as a learning exercise for myself to translate my knowledge of
 libevent in C and EventMachine in Ruby to Rust.  It is based in concept on my
-original [cliserver][1] example code for libevent.
+original [cliserver][1] example code for libevent, using the [echo server
+example][2] from tokio to get started.
 
 Clients connect to the server on port 14311, allowing them to run the following
 commands:
@@ -27,3 +28,4 @@ server using netcat: `nc localhost 14311`.
 
 [0]: https://tokio.rs
 [1]: https://github.com/mike-bourgeous/cliserver
+[2]: https://tokio.rs/docs/getting-started/simple-server/
