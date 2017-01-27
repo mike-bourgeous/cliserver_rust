@@ -6,7 +6,10 @@ extern crate tokio_service;
 use std::io;
 use std::str;
 use tokio_core::io::{Codec, EasyBuf};
+use tokio_core::io::{Io, Framed};
+use tokio_proto::pipeline::ServerProto;
 
+#[derive(Default)]
 pub struct CliCodec {
     /// Offset within the incoming EasyBuf at which newline search last ended
     search_offset: usize,
@@ -68,6 +71,22 @@ impl Codec for CliCodec {
         Ok(())
     }
 }
+
+
+pub struct CliProto;
+
+impl<T: Io + 'static> ServerProto<T> for CliProto {
+    type Request = (String, Option<String>);
+    type Response = String;
+
+    type Transport = Framed<T, CliCodec>;
+    type BindTransport = Result<Self::Transport, io::Error>;
+
+    fn bind_transport(&self, io: T) -> Self::BindTransport {
+        Ok(io.framed(CliCodec::default()))
+    }
+}
+
 
 fn main() {
     // TODO
