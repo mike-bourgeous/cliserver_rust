@@ -8,6 +8,8 @@ use std::str;
 use tokio_core::io::{Codec, EasyBuf};
 use tokio_core::io::{Io, Framed};
 use tokio_proto::pipeline::ServerProto;
+use tokio_service::Service;
+use futures::{future, Future, BoxFuture};
 
 #[derive(Default)]
 pub struct CliCodec {
@@ -43,7 +45,7 @@ impl Codec for CliCodec {
 
                 match str::from_utf8(line.as_slice()) {
                     // Return the string on successful UTF-8 decode
-                    // (TODO: split on the first space)
+                    // (TODO: split on the first space, ignore blank lines)
                     Ok(s) => Ok(Some(
                             ("Received".to_string(), Some(s.trim().to_string()))
                             )),
@@ -84,6 +86,22 @@ impl<T: Io + 'static> ServerProto<T> for CliProto {
 
     fn bind_transport(&self, io: T) -> Self::BindTransport {
         Ok(io.framed(CliCodec::default()))
+    }
+}
+
+
+pub struct CliServer;
+
+impl Service for CliServer {
+    type Request = (String, Option<String>);
+    type Response = String;
+
+    type Error = io::Error;
+
+    type Future = BoxFuture<Self::Response, Self::Error>;
+
+    fn call(&self, req: Self::Request) -> Self::Future {
+        future::ok(format!("Received: {:?}", req)).boxed()
     }
 }
 
