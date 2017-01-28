@@ -138,7 +138,7 @@ impl<'a> Service for CliServer<'a> {
             },
             None => {
                 println!("No match found for command {}", req.0);
-                future::ok(format!("Received: {:?}", req)).boxed()
+                future::ok(format!("Unknown command: {}", req.0)).boxed()
             }
         }
     }
