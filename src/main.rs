@@ -5,6 +5,7 @@ extern crate tokio_service;
 
 use std::io;
 use std::str;
+use std::collections::BTreeMap;
 use tokio_core::io::{Codec, EasyBuf};
 use tokio_core::io::{Io, Framed};
 use tokio_proto::pipeline::ServerProto;
@@ -94,13 +95,22 @@ impl<T: Io + 'static> ServerProto<T> for CliProto {
 trait CliCommand {
     fn name(&self) -> &str;
     fn description(&self) -> &str;
-    fn call(&self, args: &str) -> &str;
+    fn call(&self, args: Option<String>) -> String;
 }
 
 
-pub struct CliServer;
+#[derive(Default)]
+pub struct CliServer<'a> {
+    commands: BTreeMap<&'a str, &'a CliCommand>,
+}
 
-impl Service for CliServer {
+impl<'a> CliServer<'a> {
+    fn add_command(&mut self, cmd: &'a CliCommand) {
+        self.commands.insert(cmd.name(), cmd);
+    }
+}
+
+impl<'a> Service for CliServer<'a> {
     type Request = (String, Option<String>);
     type Response = String;
 
@@ -109,7 +119,17 @@ impl Service for CliServer {
     type Future = BoxFuture<Self::Response, Self::Error>;
 
     fn call(&self, req: Self::Request) -> Self::Future {
-        future::ok(format!("Received: {:?}", req)).boxed()
+        match self.commands.get(&req.0[..]) {
+            Some(cmd) => {
+                println!("Calling command {}", req.0);
+                // TODO: have commands return futures?
+                future::ok(cmd.call(req.1)).boxed()
+            },
+            None => {
+                println!("No match found for command {}", req.0);
+                future::ok(format!("Received: {:?}", req)).boxed()
+            }
+        }
     }
 }
 
@@ -119,5 +139,5 @@ fn main() {
     let server = TcpServer::new(CliProto, addr);
 
     println!("Serving on {}", addr);
-    server.serve(|| Ok(CliServer));
+    server.serve(|| Ok(CliServer::default()));
 }
