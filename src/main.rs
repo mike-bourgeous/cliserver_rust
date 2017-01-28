@@ -144,11 +144,36 @@ impl<'a> Service for CliServer<'a> {
     }
 }
 
+// TODO: Consider registering commands by passing two strings and a closure
+struct EchoCommand;
+
+impl CliCommand for EchoCommand {
+    fn name(&self) -> &str {
+        "echo"
+    }
+
+    fn description(&self) -> &str {
+        "Prints the command line."
+    }
+
+    fn call(&self, args: Option<String>) -> String {
+        match args {
+            Some(s) => s,
+            None => "".to_string()
+        }
+    }
+}
+
+static ECHO: EchoCommand = EchoCommand;
 
 fn main() {
     let addr = "0.0.0.0:14311".parse().unwrap();
     let server = TcpServer::new(CliProto, addr);
 
     println!("Serving on {}", addr);
-    server.serve(|| Ok(CliServer::default()));
+    server.serve(|| {
+        let mut cli = CliServer::default();
+        cli.add_command(&ECHO);
+        Ok(cli)
+    });
 }
