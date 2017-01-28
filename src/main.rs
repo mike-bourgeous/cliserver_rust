@@ -47,10 +47,21 @@ impl Codec for CliCodec {
 
                 match str::from_utf8(line.as_slice()) {
                     // Return the string on successful UTF-8 decode
-                    // (TODO: split on the first space, ignore blank lines)
-                    Ok(s) => Ok(Some(
-                            ("Received".to_string(), Some(s.trim().to_string()))
-                            )),
+                    // (TODO: ignore blank lines)
+                    Ok(s) => {
+                        // TODO: Find a better way to split the string
+                        let s = s.trim();
+
+                        let request = match s.find(' ') {
+                            Some(i) => {
+                                let (cmd, args) = s.split_at(i);
+                                (cmd.trim().to_string(), Some(args.trim().to_string()))
+                            },
+                            None => (s.to_string(), None)
+                        };
+
+                        Ok(Some(request))
+                    },
 
                     // Return an error if invalid UTF-8 is received
                     Err(e) => Err(io::Error::new(io::ErrorKind::Other, format!("invalid UTF-8: {:?}", e))),
