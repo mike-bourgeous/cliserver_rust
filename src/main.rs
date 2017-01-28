@@ -91,6 +91,13 @@ impl<T: Io + 'static> ServerProto<T> for CliProto {
 }
 
 
+trait CliCommand {
+    fn name(&self) -> &str;
+    fn description(&self) -> &str;
+    fn call(&self, args: &str) -> &str;
+}
+
+
 pub struct CliServer;
 
 impl Service for CliServer {
