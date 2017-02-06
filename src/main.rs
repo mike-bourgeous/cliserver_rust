@@ -13,15 +13,24 @@ use tokio_proto::TcpServer;
 use tokio_service::Service;
 use futures::{future, Future, BoxFuture};
 
-#[derive(Default)]
-pub struct CliCodec {
+pub struct CliCodec<T: Io + std::fmt::Debug + 'static> {
+    /// Underlying I/O object used by this codec
+    io: Option<&'static T>,
+
     /// Offset within the incoming EasyBuf at which newline search last ended
     search_offset: usize,
 }
 
-impl Codec for CliCodec {
-    /// Input type is a tuple with the command name and an optional argument string
-    type In = (String, Option<String>);
+impl<T: Io + std::fmt::Debug + 'static> CliCodec<T> {
+    /// Initializes with None for io; the IO must be set later
+    fn new() -> CliCodec<T> {
+        CliCodec { io: None, search_offset: 0 }
+    }
+}
+
+impl<T: Io + std::fmt::Debug + 'static> Codec for CliCodec<T> {
+    /// Input type is a tuple with the I/O, the command name, and an optional argument string
+    type In = (&'static T, String, Option<String>);
 
     /// Response type is just a string
     type Out = String;
@@ -55,9 +64,13 @@ impl Codec for CliCodec {
                         let request = match s.find(' ') {
                             Some(i) => {
                                 let (cmd, args) = s.split_at(i);
-                                (cmd.trim().to_string(), Some(args.trim().to_string()))
+                                (
+                                    self.io.unwrap(),
+                                    cmd.trim().to_string(),
+                                    Some(args.trim().to_string())
+                                )
                             },
-                            None => (s.to_string(), None)
+                            None => (self.io.unwrap(), s.to_string(), None)
                         };
 
                         Ok(Some(request))
@@ -90,39 +103,51 @@ impl Codec for CliCodec {
 
 pub struct CliProto;
 
-impl<T: Io + 'static> ServerProto<T> for CliProto {
-    type Request = (String, Option<String>);
+impl<T: Io + std::fmt::Debug + 'static> ServerProto<T> for CliProto {
+    type Request = (&'static T, String, Option<String>);
     type Response = String;
 
-    type Transport = Framed<T, CliCodec>;
+    type Transport = Framed<T, CliCodec<T>>;
     type BindTransport = Result<Self::Transport, io::Error>;
 
     fn bind_transport(&self, io: T) -> Self::BindTransport {
-        Ok(io.framed(CliCodec::default()))
+        println!("IO received by bind_transport: {:?}", &io);
+
+        let mut codec = CliCodec::new();
+        let io = io.framed(codec);
+        let q: Self::BindTransport = Ok(io);
+
+        codec.io = Some(io.get_ref());
+
+        q
     }
 }
 
 
-trait CliCommand {
+trait CliCommand<T: Io + std::fmt::Debug + 'static> {
     fn name(&self) -> &str;
     fn description(&self) -> &str;
-    fn call(&self, args: Option<String>) -> String;
+    fn call(&self, io: &T, args: Option<String>) -> String;
 }
 
 
 #[derive(Default)]
-pub struct CliServer<'a> {
-    commands: BTreeMap<&'a str, &'a CliCommand>,
+pub struct CliServer<'a, T: Io + std::fmt::Debug + 'static> {
+    commands: BTreeMap<&'a str, &'a CliCommand<T>>,
 }
 
-impl<'a> CliServer<'a> {
-    fn add_command(&mut self, cmd: &'a CliCommand) {
+impl<'a, T: Io + std::fmt::Debug + 'static> CliServer<'a, T> {
+    fn new() -> CliServer<'a, T> {
+        CliServer { commands: BTreeMap::new() }
+    }
+
+    fn add_command(&mut self, cmd: &'a CliCommand<T>) {
         self.commands.insert(cmd.name(), cmd);
     }
 }
 
-impl<'a> Service for CliServer<'a> {
-    type Request = (String, Option<String>);
+impl<'a, T: Io + std::fmt::Debug + 'static> Service for CliServer<'a, T> {
+    type Request = (&'static T, String, Option<String>);
     type Response = String;
 
     type Error = io::Error;
@@ -130,15 +155,17 @@ impl<'a> Service for CliServer<'a> {
     type Future = BoxFuture<Self::Response, Self::Error>;
 
     fn call(&self, req: Self::Request) -> Self::Future {
-        match self.commands.get(&req.0[..]) {
+        let (io, cmdname, args) = req;
+
+        match self.commands.get(&cmdname[..]) {
             Some(cmd) => {
-                println!("Calling command {}", req.0);
+                println!("Calling command {} for IO {:?}", cmdname, io);
                 // TODO: have commands return futures?
-                future::ok(cmd.call(req.1)).boxed()
+                future::ok(cmd.call(io, args)).boxed()
             },
             None => {
-                println!("No match found for command {}", req.0);
-                future::ok(format!("Unknown command: {}", req.0)).boxed()
+                println!("No match found for command {}", cmdname);
+                future::ok(format!("Unknown command: {}", cmdname)).boxed()
             }
         }
     }
@@ -147,7 +174,7 @@ impl<'a> Service for CliServer<'a> {
 // TODO: Consider registering commands by passing two strings and a closure
 struct EchoCommand;
 
-impl CliCommand for EchoCommand {
+impl<T: Io + std::fmt::Debug + 'static> CliCommand<T> for EchoCommand {
     fn name(&self) -> &str {
         "echo"
     }
@@ -156,7 +183,7 @@ impl CliCommand for EchoCommand {
         "Prints the command line."
     }
 
-    fn call(&self, args: Option<String>) -> String {
+    fn call(&self, io: &T, args: Option<String>) -> String {
         match args {
             Some(s) => s,
             None => "".to_string()
@@ -172,7 +199,7 @@ fn main() {
 
     println!("Serving on {}", addr);
     server.serve(|| {
-        let mut cli = CliServer::default();
+        let mut cli = CliServer::new();
         cli.add_command(&ECHO);
         Ok(cli)
     });
