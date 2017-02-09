@@ -169,7 +169,6 @@ impl<'a> Service for CliServer<'a> {
 
 // TODO: Consider registering commands by passing two strings and a closure
 struct EchoCommand;
-
 impl CliCommand for EchoCommand {
     fn name(&self) -> &str {
         "echo"
@@ -187,7 +186,18 @@ impl CliCommand for EchoCommand {
     }
 }
 
+struct InfoCommand;
+impl CliCommand for InfoCommand {
+    fn name(&self) -> &str { "info" }
+    fn description(&self) -> &str { "Prints connection information." }
+
+    fn call(&self, info: String, _args: Option<String>) -> String {
+        info
+    }
+}
+
 static ECHO: EchoCommand = EchoCommand;
+static INFO: InfoCommand = InfoCommand;
 
 fn main() {
     let addr = "0.0.0.0:14311".parse().unwrap();
@@ -197,6 +207,7 @@ fn main() {
     server.serve(|| {
         let mut cli = CliServer::new();
         cli.add_command(&ECHO);
+        cli.add_command(&INFO);
         Ok(cli)
     });
 }
