@@ -96,7 +96,7 @@ impl Codec for CliCodec {
     /// Append the String to the outgoing buffer
     fn encode(&mut self, msg: String, buf: &mut Vec<u8>) -> io::Result<()> {
         buf.extend(msg.as_bytes());
-        buf.push(b'\n');
+        buf.extend("\n> ".as_bytes());
         Ok(())
     }
 }
