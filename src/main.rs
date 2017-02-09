@@ -8,6 +8,7 @@ use std::str;
 use std::collections::BTreeMap;
 use tokio_core::io::{Codec, EasyBuf};
 use tokio_core::io::{Io, Framed};
+use tokio_core::net::TcpStream;
 use tokio_proto::pipeline::ServerProto;
 use tokio_proto::TcpServer;
 use tokio_service::Service;
@@ -103,26 +104,16 @@ impl Codec for CliCodec {
 
 pub struct CliProto;
 
-impl<T: Io + 'static + std::fmt::Debug> ServerProto<T> for CliProto {
+impl ServerProto<TcpStream> for CliProto {
     type Request = (String, String, Option<String>);
     type Response = String;
 
-    type Transport = Framed<T, CliCodec>;
+    type Transport = Framed<TcpStream, CliCodec>;
     type BindTransport = Result<Self::Transport, io::Error>;
 
-    fn bind_transport(&self, io: T) -> Self::BindTransport {
-        let info = match io {
-            tokio_core::net::TcpStream(tcp) => {
-                let addr = tcp.peer_addr().unwrap();
-                format!(
-                    "Client address: {}\nClient port: {}\n",
-                    addr.ip, addr.port
-                    )
-            },
-            _ => {
-                format!("{:?}", &io)
-            }
-        };
+    fn bind_transport(&self, io: TcpStream) -> Self::BindTransport {
+        let addr = io.peer_addr().unwrap();
+        let info = format!("Client address: {}\nClient port: {}", addr.ip(), addr.port());
         Ok(io.framed(CliCodec::new(info)))
     }
 }
