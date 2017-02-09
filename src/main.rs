@@ -111,11 +111,19 @@ impl<T: Io + 'static + std::fmt::Debug> ServerProto<T> for CliProto {
     type BindTransport = Result<Self::Transport, io::Error>;
 
     fn bind_transport(&self, io: T) -> Self::BindTransport {
-        println!("IO received by bind_transport: {:?}", &io);
-
-        // TODO: Mimic cliserver output format for TCP connections
-        let codec = CliCodec::new(format!("{:?}", &io));
-        Ok(io.framed(codec))
+        let info = match io {
+            tokio_core::net::TcpStream(tcp) => {
+                let addr = tcp.peer_addr().unwrap();
+                format!(
+                    "Client address: {}\nClient port: {}\n",
+                    addr.ip, addr.port
+                    )
+            },
+            _ => {
+                format!("{:?}", &io)
+            }
+        };
+        Ok(io.framed(CliCodec::new(info)))
     }
 }
 
