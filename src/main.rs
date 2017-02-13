@@ -122,7 +122,7 @@ impl ServerProto<TcpStream> for CliProto {
 trait CliCommand {
     fn name(&self) -> &str;
     fn description(&self) -> &str;
-    fn call(&self, info: String, args: Option<String>) -> String;
+    fn call(&self, server: &CliServer, info: String, args: Option<String>) -> String;
 }
 
 
@@ -156,7 +156,7 @@ impl<'a> Service for CliServer<'a> {
             Some(cmd) => {
                 println!("Calling command {} for IO info {:?}", cmdname, info);
                 // TODO: have commands return futures?
-                future::ok(cmd.call(info, args)).boxed()
+                future::ok(cmd.call(&self, info, args)).boxed()
             },
             None => {
                 println!("No match found for command {}", cmdname);
@@ -177,7 +177,7 @@ impl CliCommand for EchoCommand {
         "Prints the command line."
     }
 
-    fn call(&self, _info: String, args: Option<String>) -> String {
+    fn call(&self, _server: &CliServer, _info: String, args: Option<String>) -> String {
         match args {
             Some(s) => s,
             None => "".to_string()
@@ -190,13 +190,26 @@ impl CliCommand for InfoCommand {
     fn name(&self) -> &str { "info" }
     fn description(&self) -> &str { "Prints connection information." }
 
-    fn call(&self, info: String, _args: Option<String>) -> String {
+    fn call(&self, _server: &CliServer, info: String, _args: Option<String>) -> String {
         info
+    }
+}
+
+struct HelpCommand;
+impl CliCommand for HelpCommand {
+    fn name(&self) -> &str { "help" }
+    fn description(&self) -> &str { "Prints a list of commands and their descriptions." }
+
+    fn call(&self, server: &CliServer, _info: String, _args: Option<String>) -> String {
+        server.commands.values().map(|cmd| {
+            format!("{}: {}", cmd.name(), cmd.description())
+        }).collect::<Vec<_>>().as_slice().join("\n")
     }
 }
 
 static ECHO: EchoCommand = EchoCommand;
 static INFO: InfoCommand = InfoCommand;
+static HELP: HelpCommand = HelpCommand;
 
 fn main() {
     let addr = "0.0.0.0:14311".parse().unwrap();
@@ -204,9 +217,12 @@ fn main() {
 
     println!("Serving on {}", addr);
     server.serve(|| {
+        // TODO: Find a way to build the server only once?
         let mut cli = CliServer::new();
         cli.add_command(&ECHO);
         cli.add_command(&INFO);
+        cli.add_command(&HELP);
+
         Ok(cli)
     });
 }
